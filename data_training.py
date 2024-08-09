@@ -1,31 +1,39 @@
 import os  
 import numpy as np 
-import cv2 
 from tensorflow.keras.utils import to_categorical
 from keras.layers import Input, Dense 
 from keras.models import Model
 
 is_init = False
-size = -1
-
 label = []
 dictionary = {}
 c = 0
 
 for i in os.listdir():
     if i.split(".")[-1] == "npy" and not(i.split(".")[0] == "labels"):  
-        if not(is_init):
-            is_init = True 
-            X = np.load(i)
-            size = X.shape[0]
-            y = np.array([i.split('.')[0]]*size).reshape(-1,1)
+        data = np.load(i)
+        if data.ndim > 1:  # Ensure the data has more than 1 dimension
+            if not(is_init):
+                is_init = True 
+                X = data
+                size = X.shape[0]
+                y = np.array([i.split('.')[0]]*size).reshape(-1,1)
+            else:
+                if data.shape[1:] == X.shape[1:]:
+                    X = np.concatenate((X, data))
+                    y = np.concatenate((y, np.array([i.split('.')[0]]*size).reshape(-1,1)))
+                else:
+                    print(f"Skipping file {i} due to shape mismatch.")
+            label.append(i.split('.')[0])
+            dictionary[i.split('.')[0]] = c  
+            c = c + 1
         else:
-            X = np.concatenate((X, np.load(i)))
-            y = np.concatenate((y, np.array([i.split('.')[0]]*size).reshape(-1,1)))
+            print(f"Skipping file {i} due to insufficient dimensions.")
 
-        label.append(i.split('.')[0])
-        dictionary[i.split('.')[0]] = c  
-        c = c+1
+# Ensure that there is data to train on
+if not is_init:
+    print("No valid data found. Please check the .npy files.")
+    exit(1)
 
 for i in range(y.shape[0]):
     y[i, 0] = dictionary[y[i, 0]]
@@ -45,6 +53,11 @@ for i in cnt:
     X_new[counter] = X[i]
     y_new[counter] = y[i]
     counter = counter + 1
+
+# Check X's shape before proceeding
+if X.shape[1] == 0:
+    print("Data shape issue. X has no features.")
+    exit(1)
 
 # Corrected Input layer shape
 ip = Input(shape=(X.shape[1],))
